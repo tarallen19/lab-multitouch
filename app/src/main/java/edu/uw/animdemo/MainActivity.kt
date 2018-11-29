@@ -7,6 +7,8 @@ import android.content.Intent
 import android.os.Bundle
 import android.support.v4.view.GestureDetectorCompat
 import android.support.v4.view.MotionEventCompat
+import android.support.v4.view.MotionEventCompat.getX
+import android.support.v4.view.MotionEventCompat.getY
 import android.support.v7.app.AppCompatActivity
 import android.util.Log
 import android.view.GestureDetector
@@ -44,16 +46,21 @@ class MainActivity : AppCompatActivity() {
         val y = event.y - supportActionBar!!.height //closer to center...
 
         val action = MotionEventCompat.getActionMasked(event)
+
+        var pointerIndex = MotionEventCompat.getActionIndex(event)
+        var pointerId = MotionEventCompat.getPointerId(event, pointerIndex)
         when (action) {
             MotionEvent.ACTION_DOWN //put finger down
             -> {
                 //Log.v(TAG, "finger down");
-
+                //val pointerIndex = MotionEventCompat.getActionIndex(event)
                 val xAnim = ObjectAnimator.ofFloat(view!!.ball, "x", x)
                 xAnim.duration = 1000
                 val yAnim = ObjectAnimator.ofFloat(view!!.ball, "y", y)
                 yAnim.duration = 1500 //y moves 1.5x slower
-
+                view?.addTouch(MotionEventCompat.getPointerId(event,pointerIndex),
+                        getX(event, pointerIndex), getY(event, pointerIndex))
+                //val pointerID = MotionEventCompat.getPointerId(event, pointerIndex)
                 val set = AnimatorSet()
                 set.playTogether(yAnim, xAnim)
                 set.start()
@@ -64,16 +71,43 @@ class MainActivity : AppCompatActivity() {
                 //                view.ball.dy = (y - view.ball.cy)/Math.abs(y - view.ball.cy)*30;
                 return true
             }
-            MotionEvent.ACTION_MOVE //move finger
-            ->
-                //Log.v(TAG, "finger move");
-                //                view.ball.cx = x;
-                //                view.ball.cy = y;
+            MotionEvent.ACTION_POINTER_DOWN
+            -> {
+                Log.v(TAG, "Pointer Down")
+                Log.v(TAG, "Pointer Index:\t" + pointerIndex.toString())
+                view?.addTouch(MotionEventCompat.getPointerId(event,pointerIndex),
+                        getX(event, pointerIndex), getY(event, pointerIndex))
+                Log.v(TAG, "Pointer ID:\t" + pointerId.toString())
                 return true
+            }
+            MotionEvent.ACTION_MOVE //move finger
+            -> {
+                val count = MotionEventCompat.getPointerCount(event)
+                (0 until count).forEach { x ->
+                    pointerIndex = event.findPointerIndex(x)
+                    if (pointerIndex > 0) {
+                        pointerId = event.getPointerId(pointerIndex)
+                        view?.moveTouch(pointerId, getX(event, pointerIndex), getY(event, pointerIndex))
+                    } else {
+                        pointerId = event.getPointerId(0)
+                        view?.moveTouch(pointerId, getX(event, 0), getY(event, 0))
+                    }
+                }
+                return true
+            }
+            MotionEvent.ACTION_POINTER_UP
+            -> {
+                Log.v(TAG, "Pointer Up")
+                Log.v(TAG, "Pointer Index:\t" + pointerIndex.toString())
+                Log.v(TAG, "Pointer ID:\t" + pointerId.toString())
+                view?.removeTouch(pointerId)
+                return true
+            }
             MotionEvent.ACTION_UP //lift finger up
                 , MotionEvent.ACTION_CANCEL //aborted gesture
                 , MotionEvent.ACTION_OUTSIDE //outside bounds
-            -> return super.onTouchEvent(event)
+            -> {view?.removeTouch(pointerId)
+            return super.onTouchEvent(event)}
             else -> return super.onTouchEvent(event)
         }
     }
@@ -128,7 +162,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     companion object {
-
         private val TAG = "Main"
     }
 }
